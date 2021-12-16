@@ -1,70 +1,197 @@
-# Getting Started with Create React App
+### Optimistic Vs Pessimistic updates
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+```js
+handleDelete = async (event, id) => {
+  const orginalPosts = [...this.state.posts];
+  const posts = this.state.posts.filter((post) => post.id !== id);
+  this.setState({ posts });
+  try {
+    throw new Error('Custom Error');
+    await axios.delete(`${endpoint}/${id}`);
+  } catch (ex) {
+    console.log('Post could not be deleted');
+    this.setState({ posts: orginalPosts });
+  }
+};
+```
 
-## Available Scripts
+### Expected Errors Vs Unexpected Errors
 
-In the project directory, you can run:
+Expected Errors (Client Errors): Api end points predict and return
 
-### `npm start`
+- 404: Not Found
+- 400: Bad Request
+- 401: Access Denied
+- 403: Access Fobidden
+  - Client Error need not be log them.
+  - Display a specific error message to client.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Unexpected Errors
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- Internet Down
+- Server Down
+- DB Down
+- 500: Internal Server Error
+  - Log the error for future reference.
+  - Display a genreic message to client.
 
-### `npm test`
+axios error object has two properties **request** and **response**
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **response**
+  - The request was made and the server responded with a status code
+  - that falls out of the range of 2xx
+- **request**
+  - The request was made but no response was received
 
-### `npm run build`
+```js
+handleDelete = async (event, id) => {
+  const orginalPosts = [...this.state.posts];
+  const posts = this.state.posts.filter((post) => post.id !== id);
+  this.setState({ posts });
+  try {
+    // await axios.delete(`s${endpoint}/${id}`);
+    await axios.delete(`${endpoint}/99`);
+    // await axios.delete(`${endpoint}/${id}`);
+  } catch (ex) {
+    if (ex.response && ex.response.status === 404) {
+      console.log(ex, ex.request, ex.response);
+      alert('Post Not Found');
+    } else {
+      console.log(ex, ex.request, ex.response);
+      alert('Some unexpected error happened');
+    }
+    this.setState({ posts: orginalPosts });
+  }
+};
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Axios Interceptors
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```js
+// Add a request interceptor
+axios.interceptors.request.use(
+  function (config) {
+    // Do something before request is sent
+    return config;
+  },
+  function (error) {
+    // Do something with request error
+    return Promise.reject(error);
+  }
+);
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+// Add a response interceptor
+axios.interceptors.response.use(
+  function (response) {
+    // Any status code that lie within the range of 2xx cause this function to trigger
+    // Do something with response data
+    return response;
+  },
+  function (error) {
+    // Any status codes that falls outside the range of 2xx cause this function to trigger
+    // Do something with response error
+    return Promise.reject(error);
+  }
+);
+```
 
-### `npm run eject`
+use try catch block, when specific error message has to be sent
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Reusable Http Service
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```js
+import axios from 'axios';
+import { toast } from 'react-toastify';
+import * as Sentry from '@sentry/react';
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+axios.interceptors.response.use(null, (error) => {
+  const expectedError =
+    error.response &&
+    error.response.status >= 400 &&
+    error.response.status < 500;
+  if (expectedError) return Promise.reject(error);
+  //   console.log(error, error.response);
+  Sentry.captureException(error);
+  toast.error('Some unexpected error happened', { theme: 'colored' });
+});
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+export default {
+  get: axios.get,
+  post: axios.post,
+  put: axios.put,
+  delete: axios.delete,
+};
+```
 
-## Learn More
+### Config Module
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```js
+// config.json
+{
+  "endpoint": "http://localhost:3004/posts"
+}
+// app.js
+import config from './config/config.json';
+const { data: post } = await http.post(config.endpoint, bodyData);
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Displaying Toast Notifications
 
-### Code Splitting
+```js
+npm install --save react-toastify
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+import React from 'react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-### Analyzing the Bundle Size
+function App(){
+    const notify = () => {
+        toast.success("Lorem ipsum dolor", {
+        theme: "colored"
+        })
+    }
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+    return (
+        <div>
+            <button onClick={notify}>Notify !</button>
+            <ToastContainer />
+        </div>
+        );
+    }
+```
 
-### Making a Progressive Web App
+### Sentry Logger Service
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+```js
+import * as Sentry from '@sentry/react';
+import { Integrations } from '@sentry/tracing';
 
-### Advanced Configuration
+function init() {
+  Sentry.init({
+    dsn: 'https://1b36792bcac64c8ba11c58fafa8f4edb@o524407.ingest.sentry.io/6110039',
+    integrations: [new Integrations.BrowserTracing()],
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+    // Set tracesSampleRate to 1.0 to capture 100%
+    // of transactions for performance monitoring.
+    // We recommend adjusting this value in production
+    tracesSampleRate: 0,
+  });
+}
 
-### Deployment
+const captureException = Sentry.captureException;
+const captureMessage = Sentry.captureMessage;
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+export default {
+  init,
+  captureException,
+  captureMessage,
+};
 
-### `npm run build` fails to minify
+// index.js
+import logger from './services/loggerService';
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+logger.init();
+
+// app.js
+logger.captureMessage('404 Error', ex);
+```

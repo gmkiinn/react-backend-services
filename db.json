@@ -1,0 +1,29 @@
+{
+  "posts": [
+    {
+      "title": "json-server-second",
+      "author": "typicode-second",
+      "id": 2
+    },
+    {
+      "title": "json-server-third",
+      "author": "typicode-third",
+      "id": 3
+    },
+    {
+      "title": "json-server-magic",
+      "author": "mahesh",
+      "id": 6
+    },
+    {
+      "title": "json description",
+      "author": "sandhya",
+      "id": 7
+    },
+    {
+      "title": "Json-check-update",
+      "author": "Mahesh",
+      "id": 10
+    }
+  ]
+}
